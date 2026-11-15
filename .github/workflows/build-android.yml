@@ -106,17 +106,24 @@ jobs:
 
           if [ -n "$ICON_SRC" ]; then
             echo "Applying custom icon from $ICON_SRC"
+            if ! command -v convert >/dev/null 2>&1 && ! command -v magick >/dev/null 2>&1; then
+              sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
+            fi
+            IMG_CMD="convert"
+            if command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; then
+              IMG_CMD="magick"
+            fi
             rm -rf android/app/src/main/res/mipmap-anydpi-v26
-            convert "$ICON_SRC" -resize 48x48! android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-            convert "$ICON_SRC" -resize 48x48! android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
-            convert "$ICON_SRC" -resize 72x72! android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-            convert "$ICON_SRC" -resize 72x72! android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
-            convert "$ICON_SRC" -resize 96x96! android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-            convert "$ICON_SRC" -resize 96x96! android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
-            convert "$ICON_SRC" -resize 144x144! android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-            convert "$ICON_SRC" -resize 144x144! android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
-            convert "$ICON_SRC" -resize 192x192! android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-            convert "$ICON_SRC" -resize 192x192! android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+            $IMG_CMD "$ICON_SRC" -resize 48x48! android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+            $IMG_CMD "$ICON_SRC" -resize 48x48! android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+            $IMG_CMD "$ICON_SRC" -resize 72x72! android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+            $IMG_CMD "$ICON_SRC" -resize 72x72! android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+            $IMG_CMD "$ICON_SRC" -resize 96x96! android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+            $IMG_CMD "$ICON_SRC" -resize 96x96! android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+            $IMG_CMD "$ICON_SRC" -resize 144x144! android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+            $IMG_CMD "$ICON_SRC" -resize 144x144! android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+            $IMG_CMD "$ICON_SRC" -resize 192x192! android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+            $IMG_CMD "$ICON_SRC" -resize 192x192! android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
           else
             echo "No custom icon found, using default icon."
           fi
