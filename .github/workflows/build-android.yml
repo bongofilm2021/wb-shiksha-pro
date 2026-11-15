@@ -1,0 +1,153 @@
+name: Build WB Shiksha Pro APK & AAB
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Prepare Web Assets (www)
+        run: |
+          mkdir -p www
+          if [ -f "index.html" ]; then
+            cp index.html www/index.html
+          elif [ -f "www/index.html" ]; then
+            echo "Using existing www/index.html"
+          else
+            FIRST_HTML=$(ls *.html 2>/dev/null | head -n 1 || true)
+            if [ -z "$FIRST_HTML" ]; then
+              echo "Error: No HTML file found in repository!"
+              exit 1
+            fi
+            cp "$FIRST_HTML" www/index.html
+          fi
+
+      - name: Create package.json and capacitor.config.json
+        run: |
+          cat << 'EOF' > package.json
+          {
+            "name": "wb-shiksha-pro",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^6.1.2",
+              "@capacitor/android": "^6.1.2",
+              "@capacitor-community/admob": "^6.0.0"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "^6.1.2"
+            }
+          }
+          EOF
+
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.wbbsenote.wbshikshapro",
+            "appName": "WB Shiksha Pro",
+            "webDir": "www",
+            "plugins": {
+              "CapacitorHttp": {
+                "enabled": true
+              }
+            }
+          }
+          EOF
+
+      - name: Install Capacitor & Add Android Platform
+        run: |
+          npm install
+          npx cap add android
+
+      - name: Configure AdMob App ID & Permissions in AndroidManifest.xml
+        run: |
+          python3 - << 'EOF'
+          manifest_path = "android/app/src/main/AndroidManifest.xml"
+          with open(manifest_path, "r", encoding="utf-8") as f:
+              content = f.read()
+
+          admob_meta = '        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-1520960663058157~4400694176"/>'
+          if "com.google.android.gms.ads.APPLICATION_ID" not in content:
+              content = content.replace("</application>", admob_meta + "\n    </application>")
+
+          if 'android:usesCleartextTraffic="true"' not in content:
+              content = content.replace("<application", '<application android:usesCleartextTraffic="true"', 1)
+
+          with open(manifest_path, "w", encoding="utf-8") as f:
+              f.write(content)
+          EOF
+
+      - name: Set Custom App Icon (if icon.png / icon.jpg / logo.png exists)
+        run: |
+          ICON_SRC=""
+          for f in icon.png icon.jpg icon.jpeg logo.png logo.jpg; do
+            if [ -f "$f" ]; then
+              ICON_SRC="$f"
+              break
+            fi
+          done
+
+          if [ -n "$ICON_SRC" ]; then
+            echo "Applying custom icon from $ICON_SRC"
+            rm -rf android/app/src/main/res/mipmap-anydpi-v26
+            convert "$ICON_SRC" -resize 48x48! android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+            convert "$ICON_SRC" -resize 48x48! android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+            convert "$ICON_SRC" -resize 72x72! android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+            convert "$ICON_SRC" -resize 72x72! android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+            convert "$ICON_SRC" -resize 96x96! android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+            convert "$ICON_SRC" -resize 96x96! android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+            convert "$ICON_SRC" -resize 144x144! android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+            convert "$ICON_SRC" -resize 144x144! android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+            convert "$ICON_SRC" -resize 192x192! android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+            convert "$ICON_SRC" -resize 192x192! android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+          else
+            echo "No custom icon found, using default icon."
+          fi
+
+      - name: Sync Capacitor Android Project
+        run: npx cap sync android
+
+      - name: Decode Release Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Build Signed APK and Signed AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/release.keystore" \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Collect APK and AAB Outputs
+        run: |
+          mkdir -p output-files
+          cp android/app/build/outputs/apk/release/app-release.apk output-files/wb-shiksha-pro.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab output-files/wb-shiksha-pro.aab
+          ls -lh output-files
+
+      - name: Upload APK and AAB Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wb-shiksha-pro-builds
+          path: output-files/
+          retention-days: 90
