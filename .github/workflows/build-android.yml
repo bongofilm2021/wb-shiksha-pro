@@ -50,6 +50,7 @@ jobs:
             "dependencies": {
               "@capacitor/core": "^6.1.2",
               "@capacitor/android": "^6.1.2",
+              "@capacitor/app": "^6.0.0",
               "@capacitor-community/admob": "^6.0.0"
             },
             "devDependencies": {
