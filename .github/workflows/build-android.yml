@@ -95,6 +95,30 @@ jobs:
               f.write(content)
           EOF
 
+      - name: Enable Screenshot & Screen Recording Protection (FLAG_SECURE)
+        run: |
+          python3 - << 'EOF'
+          main_act = "android/app/src/main/java/com/wbbsenote/wbshikshapro/MainActivity.java"
+          with open(main_act, "w", encoding="utf-8") as f:
+              f.write("""package com.wbbsenote.wbshikshapro;
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().setFlags(
+                      WindowManager.LayoutParams.FLAG_SECURE,
+                      WindowManager.LayoutParams.FLAG_SECURE
+                  );
+              }
+          }
+          """.replace("          ", ""))
+          EOF
+
       - name: Set Custom App Icon (if icon.png / icon.jpg / logo.png exists)
         run: |
           ICON_SRC=""
